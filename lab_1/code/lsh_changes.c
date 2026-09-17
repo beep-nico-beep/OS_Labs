@@ -51,6 +51,15 @@ int main(void)
       Command cmd;
       if (parse(line, &cmd) == 1)
       {
+        pid_t pid = fork();
+        if(pid == 0){
+          Pgm *pgm = cmd.pgm;
+          while(pgm != NULL){
+            execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
+            pgm = pgm->next;
+          }
+          exit(1);
+        }
         // Print the parsed command
         print_cmd(&cmd);
       }

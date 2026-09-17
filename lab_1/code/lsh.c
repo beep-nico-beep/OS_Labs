@@ -23,6 +23,8 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <signal.h>
+#include <wait.h>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -35,6 +37,7 @@ void stripwhite(char *);
 
 int main(void)
 {
+  signal(SIGINT, SIG_IGN); // Sets the disposition of SIGINT to SIG_IGN which ignores the signal (like ctrl + c)
   for (;;)
   {
     char *line;
@@ -51,6 +54,34 @@ int main(void)
       Command cmd;
       if (parse(line, &cmd) == 1)
       {
+        if (strcmp(cmd.pgm->pgmlist[0], "exit") == 0) { // Checks if the command's string is equal to "exit"
+          exit(0); // executes the built-in function exit(0) with status 0
+        } 
+        if (strcmp(cmd.pgm->pgmlist[0], "cd") == 0) { // Checks if the command's string is "cd"
+          chdir(cmd.pgm->pgmlist[1]); // executes the built-in function chdir to enter the folder held in the second argument of pgmlist
+          continue;
+        }
+
+        pid_t pid = fork(); // forks the process
+        if (pid < 0) { // checks if fork failed
+          perror("Fork failed");
+        }
+        else if (pid == 0) { // if pid == 0, it is the child process
+          // Child process
+          if (cmd.background == 0) { // If the child is not a background process, set the disposition of SIGINT to SIG_DFL which listens to ctrl + c
+            signal(SIGINT, SIG_DFL);
+          }
+          execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist); // Execute the command using execvp in the child process
+          printf("Command failed: %s\n", cmd.pgm->pgmlist[0]); // This is only run if there is an issue with execvp
+          exit(1);
+        }
+        else {
+          // Parent process
+          if (cmd.background == 0) { // If the child is not a background job, we need to wait for it, otherwise we don't
+            wait(NULL);
+          }
+        }
+
         // Print the parsed command
         print_cmd(&cmd);
       }

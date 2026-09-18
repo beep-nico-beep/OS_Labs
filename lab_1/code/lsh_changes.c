@@ -23,6 +23,7 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <wait.h>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -44,24 +45,36 @@ int main(void)
     stripwhite(line);
 
     // If the stripped line is not blank
-    if (*line)
-    {
+    if (*line){
       add_history(line);
-
       Command cmd;
-      if (parse(line, &cmd) == 1)
-      {
-        pid_t pid = fork();
-        if(pid == 0){
-          Pgm *pgm = cmd.pgm;
-          while(pgm != NULL){
-            execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
-            pgm = pgm->next;
-          }
-          exit(1);
+      if (parse(line, &cmd) == 1){
+      Pgm *pgm = cmd.pgm;
+      int fields[2];
+      ssize_t nbytes;
+      pipe(fields);
+      pid_t pid = fork();
+      if (pid == 0){
+        while(pgm != NULL){
+          close(fields[1]);
+          nbytes = read(fields[0], cmd.rstdin, 100);
+          execvp(pgm->pgmlist[0], pgm->pgmlist);
+          close(fields[0]);
+          
+          pgm = pgm->next;
         }
+      }
+      else{
+        close(fields[0]);
+        write(fields[1], cmd.rstdout, 100);
+        close(fields[1]);
+        if(cmd.background == 0){
+          wait(NULL); 
+        }
+      }
+      
         // Print the parsed command
-        print_cmd(&cmd);
+      print_cmd(&cmd);
       }
       else
       {

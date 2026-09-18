@@ -53,7 +53,12 @@ int main(void)
       int fields[2];
       ssize_t nbytes;
       pipe(fields);
-      pid_t pid = fork();
+      pid_t pid;
+      while(pgm != NULL){
+        pid = fork();  
+        pgm = pgm->next;
+      }
+    
       if (pid == 0){
         while(pgm != NULL){
           close(fields[1]);
@@ -62,17 +67,21 @@ int main(void)
           close(fields[0]);
           
           pgm = pgm->next;
+          exit(1);
         }
       }
       else{
+
         close(fields[0]);
         write(fields[1], cmd.rstdout, 100);
         close(fields[1]);
         if(cmd.background == 0){
           wait(NULL); 
         }
+        exit(1);
       }
-      
+    
+       
         // Print the parsed command
       print_cmd(&cmd);
       }

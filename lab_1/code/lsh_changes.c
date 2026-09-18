@@ -50,37 +50,58 @@ int main(void)
       Command cmd;
       if (parse(line, &cmd) == 1){
       Pgm *pgm = cmd.pgm;
-      int fields[2];
-      ssize_t nbytes;
-      pipe(fields);
+      int current_field[2];
+      int next_field[2];
+      int multiple_instructions = 0;
       pid_t pid;
+
+      for(int i = 0; pgm->pgmlist[i] != NULL; i++){
+        printf("arg %d: %s\n", i, pgm->pgmlist[i]);
+      }
+
       while(pgm != NULL){
+        if (pgm->next != NULL){
+          pipe(current_field);
+          
+        }
         pid = fork();  
+      
+        if (pid == 0){
+          if(multiple_instructions){
+            dup2(next_field[1], STDOUT_FILENO);
+            close(next_field[0]);
+            close(next_field[1]);
+          }
+
+          if (pgm->next != NULL){
+            dup2(current_field[0], STDIN_FILENO);
+            close(current_field[1]);
+            close(current_field[0]);
+          }
+
+          execvp(pgm->pgmlist[0], pgm->pgmlist);
+          
+          perror("error");
+          exit(1);
+          
+        }  
+        else{
+          if (multiple_instructions){
+            close(next_field[0]);
+            close(next_field[1]);
+          }
+          if (pgm->next != NULL){
+            next_field[0] = current_field[0];
+            next_field[1] = current_field[1];
+            multiple_instructions = 1;
+          }
+        }
         pgm = pgm->next;
       }
-    
-      if (pid == 0){
-        while(pgm != NULL){
-          close(fields[1]);
-          nbytes = read(fields[0], cmd.rstdin, 100);
-          execvp(pgm->pgmlist[0], pgm->pgmlist);
-          close(fields[0]);
-          
-          pgm = pgm->next;
-          exit(1);
-        }
-      }
-      else{
+      if(cmd.background == 0){
+        while(wait(NULL)> 0);
 
-        close(fields[0]);
-        write(fields[1], cmd.rstdout, 100);
-        close(fields[1]);
-        if(cmd.background == 0){
-          wait(NULL); 
-        }
-        exit(1);
       }
-    
        
         // Print the parsed command
       print_cmd(&cmd);

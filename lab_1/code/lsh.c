@@ -67,9 +67,10 @@ int main(void)
           perror("Fork failed");
         }
         else if (pid == 0) { // if pid == 0, it is the child process
+          signal(SIGINT, SIG_DFL);
           // Child process
-          if (cmd.background == 0) { // If the child is not a background process, set the disposition of SIGINT to SIG_DFL which listens to ctrl + c
-            signal(SIGINT, SIG_DFL);
+          if (cmd.background) { // If the child is not a background process, set the disposition of SIGINT to SIG_DFL which listens to ctrl + c
+            setpgid(0,0);
           }
           execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist); // Execute the command using execvp in the child process
           printf("Command failed: %s\n", cmd.pgm->pgmlist[0]); // This is only run if there is an issue with execvp

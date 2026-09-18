@@ -23,15 +23,19 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <sys/wait.h>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
 
 #include "parse.h"
 
+
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
+
+static int countCommands(Pgm *p);
 
 int main(void)
 {
@@ -40,10 +44,17 @@ int main(void)
     char *line;
     line = readline("> ");
 
+    if (line == NULL) //EOF when user presses Ctrl+D
+    {
+      printf("\n");
+      exit(0);
+    }
+
     // Remove leading and trailing whitespace from the line
     stripwhite(line);
 
     // If the stripped line is not blank
+
     if (*line)
     {
       add_history(line);
@@ -51,8 +62,84 @@ int main(void)
       Command cmd;
       if (parse(line, &cmd) == 1)
       {
-        // Print the parsed command
-        print_cmd(&cmd);
+        int num_cmds = countCommands(cmd.pgm);
+        if(num_cmds == 1)
+        {
+          // Print the parsed command
+          print_cmd(&cmd);
+
+          pid_t pid = fork();
+          if (pid == 0)
+          {
+            // Child process
+            execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
+            perror("execvp");
+            exit(1);
+
+          }
+          else if (pid > 0)
+          {
+            // Parent process
+            if (!cmd.background) // Wait for the child process to finish if not running in the background
+            {
+              wait(NULL);
+            }
+          }
+          else
+          {
+            perror("fork");
+          }
+          continue;
+        }
+        else
+        {
+          int num_cmds = countCommands(cmd.pgm);
+          int pipefds[2 * (num_cmds - 1)];
+          for (int i = 0; i < num_cmds - 1; i++)
+          {
+            if (pipe(&pipefds[i * 2]) < 0)
+            {
+              perror("pipe");
+              exit(EXIT_FAILURE);
+            }
+          }
+          Pgm *current = cmd.pgm;
+          for (int i = num_cmds - 1; i >= 0; i--)
+          {
+            pid_t pid = fork();
+            if (pid == 0)
+            {
+              // Child process
+              if (i != 0)
+              {
+                dup2(pipefds[(i - 1) * 2], STDIN_FILENO);
+              }
+              if (i != num_cmds - 1)
+              {
+                dup2(pipefds[i * 2 + 1], STDOUT_FILENO);
+              }
+              // Close all pipe file descriptors in the child process
+              for (int j = 0; j < 2 * (num_cmds - 1); j++)
+              {
+                close(pipefds[j]);
+              }
+              execvp(current->pgmlist[0], current->pgmlist);
+              perror("execvp");
+              exit(1);
+            }
+            current = current->next;
+          }
+          for (int i = 0; i < 2 * (num_cmds - 1); i++)
+          {
+            close(pipefds[i]);
+          }
+          if (!cmd.background) 
+          {
+              for (int i = 0; i < num_cmds; i++) {
+                  wait(NULL);
+              }
+          }
+        }
       }
       else
       {
@@ -138,3 +225,18 @@ void stripwhite(char *string)
 
   string[++i] = '\0';
 }
+
+
+int countCommands(Pgm *p)
+{
+  int count = 0;
+  while (p != NULL)
+  {
+    count++;
+    p = p->next;
+  }
+  return count;
+}
+
+
+

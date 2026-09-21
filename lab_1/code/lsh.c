@@ -36,11 +36,13 @@ static void print_pgm(Pgm *p);
 void stripwhite(char *);
 
 static int countCommands(Pgm *p);
+void sigchld_handler(int sig);
 
 int main(void)
 {
   for (;;)
   {
+    signal(SIGCHLD, sigchld_handler);
     char *line;
     line = readline("> ");
 
@@ -68,10 +70,28 @@ int main(void)
           // Print the parsed command
           print_cmd(&cmd);
 
+          if (strcmp(cmd.pgm->pgmlist[0], "exit") == 0) 
+          { // Checks if the command's string is equal to "exit"
+            exit(0); // executes the built-in function exit(0) with status 0
+          } 
+          if (strcmp(cmd.pgm->pgmlist[0], "cd") == 0) 
+          { // Checks if the command's string is "cd"
+            chdir(cmd.pgm->pgmlist[1]); // executes the built-in function chdir to enter the folder held in the second argument of pgmlist
+            continue;
+          }
+
+          signal(SIGINT, SIG_IGN); // Ignore SIGINT in the parent process
+
+
           pid_t pid = fork();
           if (pid == 0)
           {
             // Child process
+
+            if(!cmd.background)
+            {
+              signal(SIGINT, SIG_DFL);// Restore default SIGINT behavior in the child process
+            }
             execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
             perror("execvp");
             exit(1);
@@ -110,6 +130,10 @@ int main(void)
             if (pid == 0)
             {
               // Child process
+              if(!cmd.background)
+              {
+                signal(SIGINT, SIG_DFL);// Restore default SIGINT behavior in the child process
+              }
               if (i != 0)
               {
                 dup2(pipefds[(i - 1) * 2], STDIN_FILENO);
@@ -236,6 +260,13 @@ int countCommands(Pgm *p)
     p = p->next;
   }
   return count;
+}
+
+void sigchld_handler(int sig)
+{
+    (void)sig;
+    while (waitpid(-1, NULL, WNOHANG) > 0) {
+    }
 }
 
 

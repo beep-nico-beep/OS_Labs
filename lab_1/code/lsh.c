@@ -95,7 +95,6 @@ int main(void)
             else {
               setpgid(0,0);
             }
-            raise(SIGINT);
             execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
             perror("execvp");
             exit(1);

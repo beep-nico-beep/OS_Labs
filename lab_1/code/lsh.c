@@ -92,6 +92,10 @@ int main(void)
             {
               signal(SIGINT, SIG_DFL);// Restore default SIGINT behavior in the child process
             }
+            else {
+              setpgid(0,0);
+            }
+            raise(SIGINT);
             execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
             perror("execvp");
             exit(1);

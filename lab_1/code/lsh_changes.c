@@ -38,6 +38,7 @@ int main(void)
 {
   for (;;)
   {
+    signal(SIGINT, SIG_IGN);
     char *line;
     line = readline("> ");
 
@@ -54,9 +55,13 @@ int main(void)
       int next_field[2];
       int multiple_instructions = 0;
       pid_t pid;
-
-      for(int i = 0; pgm->pgmlist[i] != NULL; i++){
-        printf("arg %d: %s\n", i, pgm->pgmlist[i]);
+      
+      if (strcmp(cmd.pgm->pgmlist[0], "exit") == 0) { // Checks if the command's string is equal to "exit"
+        exit(0); // executes the built-in function exit(0) with status 0
+      } 
+      if (strcmp(cmd.pgm->pgmlist[0], "cd") == 0) { // Checks if the command's string is "cd"
+        chdir(cmd.pgm->pgmlist[1]); // executes the built-in function chdir to enter the folder held in the second argument of pgmlist
+        continue;
       }
 
       while(pgm != NULL){
@@ -66,7 +71,15 @@ int main(void)
         }
         pid = fork();  
       
-        if (pid == 0){
+        if(pid < 0){
+          perror("fork Failed");
+        }
+        else if (pid == 0){
+          signal(SIGINT, SIG_DFL);
+          if(cmd.background){
+            setpgid(0,0);
+          }
+
           if(multiple_instructions){
             dup2(next_field[1], STDOUT_FILENO);
             close(next_field[0]);

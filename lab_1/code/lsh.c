@@ -24,6 +24,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -94,7 +95,21 @@ int main(void)
             }
             else {
               setpgid(0,0);
+              signal(SIGINT, SIG_DFL);
             }
+            if (cmd.rstdin)
+            {
+              int input_fd = open(cmd.rstdin, O_RDONLY);
+              dup2(input_fd,STDIN_FILENO);
+              close(input_fd);
+            }
+            if (cmd.rstdout)
+            {
+              int out_fd = open(cmd.rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+              dup2(out_fd,STDOUT_FILENO);
+              close(out_fd);
+            }
+
             execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
             perror("execvp");
             exit(1);
@@ -137,6 +152,11 @@ int main(void)
               {
                 signal(SIGINT, SIG_DFL);// Restore default SIGINT behavior in the child process
               }
+              else {
+                setpgid(0,0);
+                signal(SIGINT, SIG_DFL);
+              }
+
               if (i != 0)
               {
                 dup2(pipefds[(i - 1) * 2], STDIN_FILENO);
@@ -144,6 +164,18 @@ int main(void)
               if (i != num_cmds - 1)
               {
                 dup2(pipefds[i * 2 + 1], STDOUT_FILENO);
+              }
+              if (cmd.rstdin)
+              {
+                int input_fd = open(cmd.rstdin, O_RDONLY);
+                dup2(input_fd,STDIN_FILENO);
+                close(input_fd);
+              }
+              if (cmd.rstdout)
+              {
+                int out_fd = open(cmd.rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                dup2(out_fd,STDOUT_FILENO);
+                close(out_fd);
               }
               // Close all pipe file descriptors in the child process
               for (int j = 0; j < 2 * (num_cmds - 1); j++)

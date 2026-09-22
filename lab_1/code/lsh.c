@@ -87,13 +87,11 @@ int main(void)
           if (pid == 0)
           {
             // Child process
+            signal(SIGINT, SIG_DFL);
 
-            if(!cmd.background)
+            if(cmd.background)
             {
-              signal(SIGINT, SIG_DFL);// Restore default SIGINT behavior in the child process
-            }
-            else {
-              setpgid(0,0);
+              setpgid(0,0);// Restore default SIGINT behavior in the child process
             }
             execvp(cmd.pgm->pgmlist[0], cmd.pgm->pgmlist);
             perror("execvp");
@@ -133,9 +131,9 @@ int main(void)
             if (pid == 0)
             {
               // Child process
-              if(!cmd.background)
+              if(cmd.background)
               {
-                signal(SIGINT, SIG_DFL);// Restore default SIGINT behavior in the child process
+                setpgid(0,0);// Restore default SIGINT behavior in the child process
               }
               if (i != 0)
               {

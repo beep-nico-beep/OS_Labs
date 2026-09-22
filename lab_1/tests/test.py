@@ -411,7 +411,7 @@ if __name__ == "__main__":
             title="Operating Systems Lab 1",
             description=f"Unit tests for lsh built from {LSH_CODE}",
             report_name="test-lsh",
-            tested_by=os.getlogin(),
+            tested_by=os.environ.get("USER", "nico"),
             open_in_browser=True,
         )
     )

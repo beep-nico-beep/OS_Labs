@@ -165,13 +165,13 @@ int main(void)
               {
                 dup2(pipefds[i * 2 + 1], STDOUT_FILENO);
               }
-              if (cmd.rstdin)
+              if (cmd.rstdin &&  i == 0)
               {
                 int input_fd = open(cmd.rstdin, O_RDONLY);
                 dup2(input_fd,STDIN_FILENO);
                 close(input_fd);
               }
-              if (cmd.rstdout)
+              if (cmd.rstdout &&  i == num_cmds - 1)
               {
                 int out_fd = open(cmd.rstdout, O_WRONLY | O_CREAT | O_TRUNC, 0644);
                 dup2(out_fd,STDOUT_FILENO);

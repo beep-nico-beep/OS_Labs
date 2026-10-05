@@ -24,6 +24,11 @@ static int64_t ticks;
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
 
+/* List of sleeping threads. 
+   initialized in timer_init */
+static struct list sleep_list;
+
+
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
@@ -37,6 +42,8 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init (&sleep_list);
+
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -84,16 +91,25 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  // int64_t start = timer_ticks ();
+
+  // ASSERT (intr_get_level () == INTR_ON);
+  // while (timer_elapsed (start) < ticks) 
+    // thread_yield ();
+
+  enum intr_level old_level = intr_disable ();
+  struct thread *cur = thread_current ();
+  cur->wakeup_tick = ticks + timer_ticks ();
+  list_insert_ordered (&sleep_list, &cur->elem, wakeup_less, NULL);
+  thread_block ();
+  intr_set_level (old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -171,6 +187,15 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  while (!list_empty (&sleep_list))
+  {
+    struct thread *t = list_entry (list_front (&sleep_list), struct thread, elem);
+    if (t->wakeup_tick > ticks)
+      break;
+    list_pop_front (&sleep_list);
+    thread_unblock (t);
+  }
+
   thread_tick ();
 }
 
@@ -243,4 +268,16 @@ real_time_delay (int64_t num, int32_t denom)
      the possibility of overflow. */
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
+}
+
+
+//compare the wakeup_tick of two threads, return true if a's wakeup_tick is less than b's wakeup_tick
+static bool 
+wakeup_less (const struct list_elem *a,
+             const struct list_elem *b)
+{
+  const struct thread *ta = list_entry (a, struct thread, elem);
+  const struct thread *tb = list_entry (b, struct thread, elem);
+
+  return ta->wakeup_tick < tb->wakeup_tick;
 }

@@ -35,6 +35,10 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 
+static bool 
+wakeup_less (const struct list_elem *a,
+             const struct list_elem *b, void *aux UNUSED);
+
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
 void
@@ -274,7 +278,7 @@ real_time_delay (int64_t num, int32_t denom)
 //compare the wakeup_tick of two threads, return true if a's wakeup_tick is less than b's wakeup_tick
 static bool 
 wakeup_less (const struct list_elem *a,
-             const struct list_elem *b)
+             const struct list_elem *b, void *aux UNUSED)
 {
   const struct thread *ta = list_entry (a, struct thread, elem);
   const struct thread *tb = list_entry (b, struct thread, elem);

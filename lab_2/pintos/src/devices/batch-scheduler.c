@@ -247,6 +247,7 @@ void release_slot (const task_t *task) {
     cond_broadcast(&wait_conditions[3], &my_lock);
 
   }
+  lock_release(&my_lock);
 
   /* TODO: Release the slot, think about the actions you need to perform:
    *       - Do you need to notify any waiting task?

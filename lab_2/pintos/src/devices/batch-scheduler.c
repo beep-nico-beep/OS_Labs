@@ -240,11 +240,14 @@ void release_slot (const task_t *task) {
   if(waiting_to_go_list[task->direction] > 0){
     cond_signal(&wait_conditions[task->direction], &my_lock);
   }
-  else if(task_on_bus_count == 0){
-    cond_broadcast(&wait_conditions[0], &my_lock);
-    cond_broadcast(&wait_conditions[1], &my_lock);
-    cond_broadcast(&wait_conditions[2], &my_lock);
-    cond_broadcast(&wait_conditions[3], &my_lock);
+  else if(waiting_to_go_list[1 - task->direction] > 0) {
+    cond_signal(&wait_conditions[1 - task->direction], &my_lock);
+  }
+  else if(waiting_to_go_list[task->direction + 2] > 0) {
+    cond_signal(&wait_conditions[task->direction + 2], &my_lock);
+  }
+  else if(waiting_to_go_list[3 - task->direction] > 0) {
+    cond_signal(&wait_conditions[3 - task->direction], &my_lock);
 
   }
   lock_release(&my_lock);

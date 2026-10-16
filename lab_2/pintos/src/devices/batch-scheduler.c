@@ -57,13 +57,13 @@ typedef struct {
 } task_t;
 
 struct lock my_lock; 
-struct condition my_condition;
 direction_t current_direction;
 int task_on_bus_count;
 
 
 //0 = SEND, PRIORITY / 1 = RECEIVE, PRIORITY / 2 = SEND, NORMAL / 3 = RECEIVE, NORMAL
 int waiting_to_go_list[4] = {0};
+struct condition wait_conditions[4];
 
 
 
@@ -89,10 +89,13 @@ static void release_slot (const task_t *task);
 
 void init_bus (void) {
   random_init ((unsigned int)123456789);
-  cond_init(&my_condition);
   lock_init(&my_lock);
   current_direction = SEND; 
   task_on_bus_count = 0;
+
+  for (int i = 0; i < 4; i++) {
+    cond_init(&wait_conditions[i]);
+  }
   
 
   /* TODO: Initialize global/static variables,
@@ -197,14 +200,14 @@ void get_slot (const task_t *task) {
   if(task->priority == PRIORITY){
     while(task_on_bus_count == 3 || (task_on_bus_count > 0 && current_direction != task->direction)){
       waiting_to_go_list[task->direction]++;
-      cond_wait(waiting_to_go_list[task->direction], &my_lock);
+      cond_wait(&wait_conditions[task->direction], &my_lock);
       waiting_to_go_list[task->direction]--;
     }
   }
   else{
     while(task_on_bus_count == 3 || (task_on_bus_count > 0 && current_direction != task->direction) || waiting_to_go_list[0] != 0 || waiting_to_go_list[1] != 0){
       waiting_to_go_list[task->direction + 2]++;
-      cond_wait(waiting_to_go_list[task->direction + 2], &my_lock);
+      cond_wait(&wait_conditions[task->direction + 2], &my_lock);
       waiting_to_go_list[task->direction + 2]--;
     }
   }
@@ -235,18 +238,23 @@ void release_slot (const task_t *task) {
   task_on_bus_count--;
 
   if(waiting_to_go_list[task->direction] > 0){
-    cond_signal(waiting_to_go_list[task->direction], &my_lock);
+    cond_signal(&wait_conditions[task->direction], &my_lock);
   }
-  else if(task_on_bus_count == 0){
-    cond_broadcast(waiting_to_go_list[0], &my_lock);
-    cond_broadcast(waiting_to_go_list[1], &my_lock);
-    cond_broadcast(waiting_to_go_list[2], &my_lock);
-    cond_broadcast(waiting_to_go_list[3], &my_lock);
+  else if(waiting_to_go_list[1 - task->direction] > 0) {
+    cond_signal(&wait_conditions[1 - task->direction], &my_lock);
+  }
+  else if(waiting_to_go_list[task->direction + 2] > 0) {
+    cond_signal(&wait_conditions[task->direction + 2], &my_lock);
+  }
+  else if(waiting_to_go_list[3 - task->direction] > 0) {
+    cond_signal(&wait_conditions[3 - task->direction], &my_lock);
 
   }
+  lock_release(&my_lock);
 
   /* TODO: Release the slot, think about the actions you need to perform:
    *       - Do you need to notify any waiting task?
    *       - Do you need to increment/decrement any counter?
    */
 }
+

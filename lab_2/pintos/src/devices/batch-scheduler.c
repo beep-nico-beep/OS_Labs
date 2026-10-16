@@ -243,13 +243,9 @@ void release_slot (const task_t *task) {
   else if(waiting_to_go_list[1 - task->direction] > 0) {
     cond_signal(&wait_conditions[1 - task->direction], &my_lock);
   }
-  else if(waiting_to_go_list[task->direction + 2] > 0) {
-    cond_signal(&wait_conditions[task->direction + 2], &my_lock);
-  }
-  else if(waiting_to_go_list[3 - task->direction] > 0) {
-    cond_signal(&wait_conditions[3 - task->direction], &my_lock);
-
-  }
+  else{
+    cond_broadcast(&wait_conditions, &my_lock);
+  } 
   lock_release(&my_lock);
 
   /* TODO: Release the slot, think about the actions you need to perform:
